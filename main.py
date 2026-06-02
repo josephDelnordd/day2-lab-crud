@@ -1,7 +1,7 @@
 import logging
 from typing import Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header, Depends
 
 from models import Server, ServerIn, ServerOut
 from health import HealthChecker
@@ -35,6 +35,15 @@ checker = HealthChecker()
 
 
 # ─────────────────────────────────────────────────────────────
+# API Key security (Stretch Goal)
+# ─────────────────────────────────────────────────────────────
+
+def require_api_key(x_api_key: str = Header(...)):
+    if x_api_key != "ops-secret":
+        raise HTTPException(status_code=403, detail="Invalid API key")
+
+
+# ─────────────────────────────────────────────────────────────
 # Endpoints
 # ─────────────────────────────────────────────────────────────
 
@@ -47,9 +56,14 @@ async def health_check():
     }
 
 
-@app.post("/servers", response_model=ServerOut, status_code=201)
+@app.post(
+    "/servers",
+    response_model=ServerOut,
+    status_code=201,
+    dependencies=[Depends(require_api_key)],
+)
 async def register_server(server: ServerIn):
-    """Register a new server."""
+    """Register a new server (protected by API key)."""
     global _counter
     _counter += 1
 
@@ -86,9 +100,13 @@ async def get_server(server_id: int):
     return _store[server_id]
 
 
-@app.delete("/servers/{server_id}", status_code=204)
+@app.delete(
+    "/servers/{server_id}",
+    status_code=204,
+    dependencies=[Depends(require_api_key)],
+)
 async def delete_server(server_id: int):
-    """Delete a server."""
+    """Delete a server (protected by API key)."""
     if server_id not in _store:
         raise HTTPException(status_code=404, detail="Server not found")
 
